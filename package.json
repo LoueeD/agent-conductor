@@ -1,12 +1,23 @@
 {
   "name": "agent-conductor",
   "type": "module",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "A tiny dependency-free TypeScript runtime for structured agent actions.",
   "license": "MIT",
   "engines": {
     "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LoueeD/agent-conductor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LoueeD/agent-conductor/issues"
+  },
+  "homepage": "https://github.com/LoueeD/agent-conductor#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "exports": {
     ".": {
