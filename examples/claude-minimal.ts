@@ -7,8 +7,14 @@ const runtime = createRuntime({
     add_note: action({
       description: "Add a short note to the in-memory notes list",
       input: s.object({
-        text: s.string().describe("The note text to add"),
+        text: s.string().min(1).max(500).describe("The note text to add"),
       }),
+      output: s.object({
+        index: s.int().min(0),
+        text: s.string(),
+      }),
+      requiresApproval: false,
+      risk: "low",
       preview: ({ input }) => ({
         title: `Add note: ${input.text}`,
       }),
@@ -44,7 +50,7 @@ async function planWithClaude(request: string): Promise<Plan> {
           role: "user",
           content: JSON.stringify({
             request,
-            capabilities: runtime.search().actions,
+            manifest: runtime.describe(),
             outputShape: {
               summary: "string",
               actions: [{ type: "add_note", input: { text: "string" } }],

@@ -1,7 +1,7 @@
 {
   "name": "agent-conductor",
   "type": "module",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A tiny dependency-free TypeScript runtime for structured agent actions.",
   "license": "MIT",
   "engines": {
@@ -32,10 +32,12 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
+    "check": "npm run typecheck && npm test && npm run coverage && npm run smoke",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
+    "smoke": "npm run build && node test/dist-smoke.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"

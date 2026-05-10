@@ -78,14 +78,21 @@ const runtime = createRuntime<AppContext>({
       tags: ["tasks", "planning"],
 
       input: s.object({
-        title: s.string(),
+        title: s.string().min(1).max(200),
         priority: s.enum(["low", "normal", "high"]).optional(),
+      }),
+
+      output: s.object({
+        id: s.string(),
       }),
 
       preview: ({ input }) => ({
         title: `Create task "${input.title}"`,
         impact: "Creates one new task",
       }),
+
+      requiresApproval: true,
+      risk: "low",
 
       execute: async ({ input, ctx }) => {
         return ctx.tasks.createTask(input);
@@ -199,6 +206,8 @@ ANTHROPIC_API_KEY=sk-ant-... npx tsx examples/claude-minimal.ts \
 
 ```ts
 runtime.search(query?);
+runtime.planSchema();
+runtime.describe();
 runtime.validate(plan, ctx);
 runtime.preview(plan, ctx);
 runtime.execute(plan, ctx, options?);
@@ -233,10 +242,36 @@ runtime.search("tasks");
         },
         "required": ["title"],
         "additionalProperties": false
-      }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "requiresApproval": true,
+      "risk": "low"
     }
   ]
 }
+```
+
+### `planSchema()`
+
+Returns a compact JSON-schema-like description of the plan envelope, including known action types and their input schemas.
+
+```ts
+runtime.planSchema();
+```
+
+### `describe()`
+
+Returns a runtime manifest containing action capabilities and the plan schema. This is useful when prompting an LLM to produce valid plans.
+
+```ts
+const manifest = runtime.describe();
 ```
 
 ### `validate(plan, ctx)`
@@ -277,7 +312,13 @@ Validates the plan and returns approval-friendly preview data. It never executes
       "impact": "Creates one new task"
     }
   ],
-  "requiresApproval": true
+  "requiresApproval": true,
+  "approval": {
+    "required": true,
+    "stepIndexes": [0],
+    "destructive": false,
+    "highestRisk": "low"
+  }
 }
 ```
 
@@ -292,7 +333,7 @@ const result = await runtime.execute(plan, ctx, {
 });
 ```
 
-The runtime passes an `AbortSignal` to each action. Cancellation is cooperative: handlers should observe the signal for best results.
+The runtime passes an `AbortSignal` to each action. Cancellation is cooperative: handlers should observe the signal for best results. A timeout or external abort makes `execute()` return an aborted/failed result, but JavaScript cannot forcibly stop handler code that ignores the signal, so side effects may still complete in the background.
 
 ---
 
@@ -305,6 +346,11 @@ type Action<Input, Output, Context> = {
   description: string;
   tags?: string[];
   input: Schema<Input>;
+  output?: Schema<Output>;
+
+  requiresApproval?: boolean;
+  destructive?: boolean;
+  risk?: "low" | "medium" | "high";
 
   preview?: (args: {
     input: Input;
@@ -338,6 +384,10 @@ Required fields:
 Optional fields:
 
 - `tags`
+- `output` — validates action outputs and exposes output shape during capability discovery
+- `requiresApproval` — defaults to `true`; used by previews and capability descriptions
+- `destructive` — marks actions that may delete, overwrite, charge, send, or otherwise cause higher-impact side effects
+- `risk` — optional `"low" | "medium" | "high"` metadata for approval UIs
 - `preview`
 - `authorize`
 - `idempotencyKey` — skips duplicate actions with the same key within one execution and reuses the prior output
@@ -395,10 +445,13 @@ Later steps can reference outputs from earlier steps:
 Reference rules:
 
 - refs must be pure objects: `{ "$ref": "stepId.output.path" }`
+- malformed refs are rejected during validation
 - refs can only point to previous steps
 - refs can only read from outputs
 - refs are resolved before each step executes
 - resolved inputs are validated again before execution
+- if a referenced step has an `output` schema, ref output paths are checked during validation
+- without an `output` schema, unresolved output paths may still fail at execution
 - no expressions or string interpolation
 
 ---
@@ -409,9 +462,9 @@ agent-conductor includes a small serializable schema builder exposed as `s`.
 
 ```ts
 const input = s.object({
-  title: s.string(),
+  title: s.string().min(1).max(200),
   priority: s.enum(["low", "normal", "high"]).optional(),
-  labels: s.array(s.string()).optional(),
+  labels: s.array(s.string()).max(10).optional(),
 });
 
 const parsed = input.parse(value);
@@ -420,19 +473,20 @@ const json = input.toJSON();
 
 Supported schemas:
 
-- `s.string()`
-- `s.number()`
-- `s.int()`
+- `s.string()` with `.min(length)`, `.max(length)`, `.regex(pattern)`
+- `s.number()` with `.min(value)`, `.max(value)`
+- `s.int()` with `.min(value)`, `.max(value)`
 - `s.boolean()`
 - `s.literal(value)`
 - `s.enum(values)`
-- `s.array(schema)`
-- `s.object(shape)`
+- `s.array(schema)` with `.min(length)`, `.max(length)`
+- `s.object(shape)` — rejects unknown properties
 - `s.union([...])`
 - `s.discriminatedUnion(key, [...])`
 - `s.optional(schema)` / `.optional()`
 - `s.nullable(schema)` / `.nullable()`
 - `s.describe(schema, description)` / `.describe(description)`
+- `s.refine(schema, predicate, message)` / `.refine(predicate, message)`
 - `s.record(schema)`
 - `s.unknown()`
 
@@ -472,7 +526,7 @@ agent-conductor does not manage auth, storage, tenant isolation, logging, tracin
 
 ## Hooks
 
-Hooks provide basic observability and integration points without a plugin system.
+Hooks provide basic observability and integration points without a plugin system. Hook failures are treated as programmer/integration errors and may throw from the runtime method that invoked them.
 
 ```ts
 const runtime = createRuntime({
@@ -559,6 +613,7 @@ type RuntimeError = {
   code:
     | "INVALID_PLAN"
     | "UNKNOWN_ACTION"
+    | "UNKNOWN_TOOL"
     | "INVALID_INPUT"
     | "UNAUTHORIZED"
     | "ACTION_FAILED"
@@ -616,10 +671,14 @@ Excluded:
 
 ```sh
 npm install
+npm run check
+
+# Or run individual checks:
 npm run typecheck
 npm test
 npm run coverage
 npm run build
+npm run smoke
 ```
 
 Coverage is configured with Vitest and V8. The goal is 100% coverage for the public v1 surface.

@@ -24,8 +24,14 @@ const runtime = createRuntime<AppContext>({
       description: "Create a task",
       tags: ["tasks", "planning"],
       input: s.object({
+        title: s.string().min(1).max(200),
+      }),
+      output: s.object({
+        id: s.string(),
         title: s.string(),
       }),
+      requiresApproval: true,
+      risk: "low",
       preview: ({ input }) => ({
         title: `Create task: ${input.title}`,
         impact: "Inserts one row into the tasks table",
@@ -47,8 +53,14 @@ const runtime = createRuntime<AppContext>({
       tags: ["tasks", "assignment"],
       input: s.object({
         taskId: s.string(),
+        assignee: s.string().min(1).max(100),
+      }),
+      output: s.object({
+        id: s.string(),
         assignee: s.string(),
       }),
+      requiresApproval: true,
+      risk: "low",
       preview: ({ input }) => ({
         title: `Assign task ${input.taskId} to ${input.assignee}`,
         impact: "Updates one task row",
@@ -71,6 +83,12 @@ const runtime = createRuntime<AppContext>({
       input: s.object({
         taskId: s.string(),
       }),
+      output: s.object({
+        id: s.string(),
+        completed: s.boolean(),
+      }),
+      requiresApproval: true,
+      risk: "low",
       preview: ({ input }) => ({
         title: `Complete task ${input.taskId}`,
         impact: "Marks one task row as completed",
@@ -93,7 +111,7 @@ async function planWithOpenAI(request: string): Promise<Plan> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("Set OPENAI_API_KEY first");
 
-  const capabilities = runtime.search("tasks").actions;
+  const manifest = runtime.describe();
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -117,7 +135,7 @@ async function planWithOpenAI(request: string): Promise<Plan> {
           role: "user",
           content: JSON.stringify({
             request,
-            capabilities,
+            manifest,
             referenceSyntax: {
               description: "Later steps can reference previous outputs with pure ref objects.",
               example: { $ref: "first_task.output.id" },

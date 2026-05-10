@@ -1,10 +1,14 @@
 import type { Schema } from "./schema";
-import type { MaybePromise, Preview } from "./types";
+import type { MaybePromise, Preview, RiskLevel } from "./types";
 
 export type Action<Input, Output, Context> = {
   description: string;
   tags?: string[];
   input: Schema<Input>;
+  output?: Schema<Output>;
+  requiresApproval?: boolean;
+  destructive?: boolean;
+  risk?: RiskLevel;
   preview?: (args: { input: Input; ctx: Context }) => MaybePromise<Preview>;
   execute: (args: { input: Input; ctx: Context; signal?: AbortSignal }) => MaybePromise<Output>;
   authorize?: (args: { input: Input; ctx: Context }) => MaybePromise<boolean>;

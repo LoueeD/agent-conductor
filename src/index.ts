@@ -3,8 +3,9 @@ export type { Action, ActionMap } from "./action";
 export { createRuntime } from "./runtime";
 export type { CreateRuntimeOptions, RuntimeHooks, RuntimeLimits } from "./runtime";
 export { s } from "./schema";
-export type { InferSchema, JsonSchemaLike, ParseResult, Schema } from "./schema";
+export type { ArraySchema, InferSchema, JsonSchemaLike, NumberSchema, ParseResult, Schema, StringSchema } from "./schema";
 export type {
+  ApprovalSummary,
   Capability,
   CapabilitySearchResult,
   ExecuteOptions,
@@ -16,6 +17,8 @@ export type {
   PreviewResult,
   PreviewStep,
   Runtime,
+  RiskLevel,
+  RuntimeDescription,
   RuntimeError,
   RuntimeErrorCode,
   StepResult,
