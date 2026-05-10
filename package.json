@@ -1,7 +1,7 @@
 {
   "name": "agent-conductor",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A tiny dependency-free TypeScript runtime for structured agent actions.",
   "license": "MIT",
   "engines": {
@@ -35,9 +35,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@vitest/coverage-v8": "^4.1.5",
     "tsdown": "^0.21.7",
     "typescript": "^6.0.2",

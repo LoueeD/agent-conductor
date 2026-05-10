@@ -186,6 +186,13 @@ OPENAI_API_KEY=sk-... npx tsx examples/openai-sqlite-tasks.ts \
 
 > `tsx` is only used to run the TypeScript example directly. It is not required by agent-conductor.
 
+For a smaller Anthropic Claude example, see [`examples/claude-minimal.ts`](./examples/claude-minimal.ts). It exposes one `add_note` action, asks Claude to return a JSON plan, previews it, and executes it:
+
+```sh
+ANTHROPIC_API_KEY=sk-ant-... npx tsx examples/claude-minimal.ts \
+  "Add a note saying ship the tiny runtime"
+```
+
 ---
 
 ## Runtime API
