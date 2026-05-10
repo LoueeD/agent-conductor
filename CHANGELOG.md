@@ -1,5 +1,11 @@
 # agent-conductor
 
+## 0.3.0
+
+### Minor Changes
+
+- Tighten approval, validation, schema optionality, timeout semantics
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,7 +1,7 @@
 import type { ActionMap } from "./action";
 import { executePlan } from "./execute";
 import type { RuntimeHooks } from "./hooks";
-import { defaultLimits, type RuntimeLimits } from "./limits";
+import { normalizeLimits, type RuntimeLimits } from "./limits";
 import { describeRuntime, planSchema as createPlanSchema } from "./manifest";
 import { mcpTools as createMcpTools, handleMcpToolCall } from "./mcp";
 import { previewPlan } from "./preview";
@@ -20,7 +20,7 @@ export type CreateRuntimeOptions<Ctx, Actions extends ActionMap<Ctx> = ActionMap
 
 export function createRuntime<Ctx, Actions extends ActionMap<Ctx> = ActionMap<Ctx>>(options: CreateRuntimeOptions<Ctx, Actions>): Runtime<Ctx> {
   const actions = options.actions;
-  const limits = { ...defaultLimits, ...options.limits };
+  const limits = normalizeLimits(options.limits);
   const hooks = options.hooks;
   const entries = Object.entries(actions);
 

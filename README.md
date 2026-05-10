@@ -4,11 +4,13 @@
 
 It helps applications expose a small, safe action surface to AI agents: agents can discover capabilities, propose ordered plans, preview impact, and execute approved actions through your trusted backend code.
 
+The small surface area is intentional. MCP tool definitions and runtime manifests usually end up inside the model context window, so every action name, description, schema, and tool result competes with the user's actual task for tokens. agent-conductor is designed around a compact workflow surface instead of a one-tool-per-API-endpoint wrapper.
+
 ```txt
 Discover capabilities → create plan → validate → preview → execute
 ```
 
-Instead of giving an agent arbitrary code execution or hundreds of low-level tools, agent-conductor gives it allowlisted actions, schema validation, dry runs, approval-friendly previews, and sequential execution.
+Instead of giving an agent arbitrary code execution or hundreds of low-level tools, agent-conductor gives it allowlisted workflow actions, schema validation, dry runs, approval-friendly previews, and sequential execution.
 
 ---
 
@@ -28,7 +30,7 @@ Developer-defined actions
 Application backend
 ```
 
-Your app owns the dangerous parts: auth, data access, side effects, billing, logging, and tenant boundaries. agent-conductor owns the middle: discovery, validation, preview, execution, and MCP-compatible tool descriptions.
+Your app owns the dangerous parts: auth, data access, side effects, billing, logging, and tenant boundaries. agent-conductor owns the middle: discovery, validation, preview, execution, and MCP-compatible tool descriptions. Keep actions coarse enough to match the model's natural workflow, but strict enough that each action is still safe, auditable, and easy to approve.
 
 It is **not**:
 
@@ -266,6 +268,8 @@ Returns a compact JSON-schema-like description of the plan envelope, including k
 runtime.planSchema();
 ```
 
+Treat this as prompt material. It should be small enough to include in model context when you ask an agent to produce a plan.
+
 ### `describe()`
 
 Returns a runtime manifest containing action capabilities and the plan schema. This is useful when prompting an LLM to produce valid plans.
@@ -273,6 +277,8 @@ Returns a runtime manifest containing action capabilities and the plan schema. T
 ```ts
 const manifest = runtime.describe();
 ```
+
+The manifest is intentionally compact, but it still grows with every action, field, description, and output schema. Prefer a handful of workflow-shaped actions over a large mirror of your internal API.
 
 ### `validate(plan, ctx)`
 
@@ -562,11 +568,13 @@ const runtime = createRuntime({
 
 Execution is sequential in v1. Parallelism, transactions, rollback, queues, retries, and branching are intentionally excluded.
 
+Limit values must be non-negative safe integers. Passing `undefined` for a limit override keeps the default value.
+
 ---
 
 ## MCP-compatible surface
 
-agent-conductor does not depend on the MCP SDK, but it can expose SDK-agnostic tool definitions:
+agent-conductor does not depend on the MCP SDK, but it can expose SDK-agnostic tool definitions. In most MCP clients, those tool definitions are serialized into the model context before generation. That means MCP design is partly context design: a large tool set can make the model slower, less reliable, and more expensive before it calls a single tool.
 
 ```ts
 const tools = runtime.mcpTools();
@@ -601,6 +609,20 @@ for (const tool of runtime.mcpTools()) {
 ```
 
 agent-conductor does not know about transports, sessions, clients, stdio, or HTTP.
+
+### MCP context budget
+
+When exposing a runtime through MCP, optimize for the model's working context rather than for REST-style endpoint purity:
+
+- Prefer workflow actions over thin endpoint wrappers. For example, `get_project_snapshot` is usually easier for a model than `get_project`, `get_member`, `get_permission`, and `get_activity` chained together.
+- Keep action names explicit and namespaced enough to survive clients with many installed tools.
+- Write descriptions for the model, not just for humans. Include when to use the action and what kind of result to expect, but avoid long examples unless they materially improve tool choice.
+- Keep schemas tight. Remove optional fields the model does not need, use enums for constrained choices, and avoid deeply nested inputs when a flatter shape is enough.
+- Return compact outputs. Tool results also enter the context window, so prefer IDs, summaries, and bounded lists over full records by default.
+- Use `runtime.search(query)` before showing a full manifest when the client flow allows it. Search lets an agent narrow the action set before you spend tokens on every capability.
+- Test with a small context budget or a weaker/local model. If tool selection only works with a huge context window, the MCP surface is probably doing too much.
+
+This is why agent-conductor exposes four stable MCP tools for the runtime itself and keeps your application actions inside the plan manifest. The model can discover capabilities, validate a proposed plan, preview impact, and execute after approval without carrying hundreds of direct backend tools.
 
 ---
 

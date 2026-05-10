@@ -191,6 +191,8 @@ describe("runtime", () => {
   it("throws for invalid runtime definitions", () => {
     expect(() => createRuntime({ actions: { "bad name": action({ description: "x", input: s.unknown(), execute: () => undefined }) } })).toThrow("Invalid action name");
     expect(() => createRuntime({ actions: { bad: { description: "", input: s.unknown(), execute: () => undefined } as any } })).toThrow("Invalid action definition");
+    expect(() => createRuntime({ limits: { maxActions: -1 }, actions: {} })).toThrow("Invalid runtime limit maxActions");
+    expect(() => createRuntime({ limits: { stepTimeoutMs: Number.POSITIVE_INFINITY }, actions: {} })).toThrow("Invalid runtime limit stepTimeoutMs");
   });
 
   it("returns structured validation errors", async () => {
@@ -231,6 +233,8 @@ describe("runtime", () => {
     expect((await runtime.validate({ actions: [{ type: "auth", input: { allowed: false } }] }, {})).ok).toBe(false);
     const inputLimited = createRuntime({ limits: { maxInputBytes: 10 }, actions: { auth: action({ description: "auth", input: s.unknown(), execute: () => undefined }) } });
     expect((await inputLimited.validate({ actions: [{ type: "auth", input: { allowed: true, extra: "too long" } }] }, {})).ok).toBe(false);
+    const defaultLimited = createRuntime({ limits: { maxActions: undefined } as any, actions: { auth: action({ description: "auth", input: s.unknown(), execute: () => undefined }) } });
+    expect((await defaultLimited.validate({ actions: Array.from({ length: 51 }, () => ({ type: "auth", input: null })) }, {})).ok).toBe(false);
     const result = await runtime.execute({ actions: [{ type: "auth", input: { allowed: true } }] }, {});
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors[0]?.message).toContain("Output exceeds");
@@ -364,6 +368,18 @@ describe("runtime", () => {
   it("exposes MCP-compatible tools and dispatcher", async () => {
     const runtime = createRuntime({ actions: { echo: action({ description: "Echo", input: s.object({ value: s.string() }), destructive: true, risk: "medium", execute: ({ input }) => input }) } });
     expect(runtime.mcpTools().map(tool => tool.name)).toEqual(["search_capabilities", "validate_plan", "preview_plan", "execute_plan"]);
+    expect(runtime.mcpTools().find(tool => tool.name === "validate_plan")?.inputSchema).toEqual({
+      type: "object",
+      properties: { plan: {} },
+      required: ["plan"],
+      additionalProperties: false,
+    });
+    expect(runtime.mcpTools().find(tool => tool.name === "execute_plan")?.inputSchema).toEqual({
+      type: "object",
+      properties: { plan: {}, dryRun: { type: "boolean", optional: true } },
+      required: ["plan"],
+      additionalProperties: false,
+    });
     expect(await runtime.handleToolCall("search_capabilities", { query: "echo" }, {})).toEqual(runtime.search("echo"));
     expect(runtime.search("echo").actions[0]).toMatchObject({ destructive: true, risk: "medium", requiresApproval: true });
     const approvalPreview = await runtime.preview({ actions: [{ type: "echo", input: { value: "x" } }] }, {});

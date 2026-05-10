@@ -3,12 +3,23 @@ import { s } from "./schema";
 import type { ExecuteOptions, Runtime, ToolDefinition } from "./types";
 
 export function mcpTools(): ToolDefinition[] {
-  const planSchema = s.object({ plan: s.unknown(), dryRun: s.boolean().optional() }).toJSON();
+  const planSchema = {
+    type: "object",
+    properties: { plan: {} },
+    required: ["plan"],
+    additionalProperties: false,
+  };
+  const executeSchema = {
+    type: "object",
+    properties: { plan: {}, dryRun: { type: "boolean", optional: true } },
+    required: ["plan"],
+    additionalProperties: false,
+  };
   return [
     { name: "search_capabilities", description: "Search available structured actions", inputSchema: s.object({ query: s.string().optional() }).toJSON() },
     { name: "validate_plan", description: "Validate a structured action plan", inputSchema: planSchema },
     { name: "preview_plan", description: "Preview a structured action plan", inputSchema: planSchema },
-    { name: "execute_plan", description: "Execute a validated structured action plan", inputSchema: planSchema },
+    { name: "execute_plan", description: "Execute a validated structured action plan", inputSchema: executeSchema },
   ];
 }
 
