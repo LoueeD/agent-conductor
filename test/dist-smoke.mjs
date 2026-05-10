@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { action, createRuntime, s } from "../dist/index.mjs";
+import { action, createRuntime, s } from "../dist/index.js";
 
 const runtime = createRuntime({
   actions: {
